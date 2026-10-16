@@ -1,0 +1,350 @@
+grammar KannadaC;   // ಕಸ್ತೂರಿ (Kasturi) - ಕನ್ನಡ ಆಧಾರಿತ C ಭಾಷೆ
+
+// =====================================================================
+//  Revision 2 of the grammar.
+//
+//  Changes with respect to the original grammar (kept in
+//  grammar.original.txt):
+//
+//   1. 'ಸತ್ಯ' was both a type keyword and the boolean literal TRUE. The
+//      boolean type is now 'ತಾರ್ಕಿಕ'; 'ಸತ್ಯ' / 'ಅಸತ್ಯ' are the literals.
+//   2. Function calls were missing (functions could be declared but never
+//      called). Calls are now postfix expressions and may be used as
+//      statements.
+//   3. Pointers ('*', '&', '->'), struct variables and member access ('.'),
+//      'ಗಾತ್ರ' (sizeof), casts, '%' ('ಶೇಷ'), unary minus, bitwise and shift
+//      operators and the conditional operator '?:' were added (C parity).
+//   4. Added 'ದೀರ್ಘ' (64-bit integer), 'ಶೂನ್ಯ*' (void pointer), 'ಚರಪಟ್ಟಿ'
+//      (va_list) and the null pointer literal 'ಖಾಲಿ'.
+//   5. Added do-while ('ಮಾಡು'), switch ('ಆಯ್ಕೆ' / 'ಸಂದರ್ಭ' /
+//      'ಪೂರ್ವನಿಯೋಜಿತ'), compound assignment, '++' / '--', the empty
+//      statement, 'ಸಾಲುಮುದ್ರಿಸು' (print with newline) and 'ಓದು' (read).
+//   6. Added 'ಆಮದು' (import a module), 'ಬಾಹ್ಯ' (declare a function or
+//      variable implemented in C - needed for the standard library) and
+//      variadic functions ('...', 'ಚರ_ಆರಂಭ', 'ಚರ_ಮೌಲ್ಯ', 'ಚರ_ಅಂತ್ಯ',
+//      'ಚರ_ನಕಲು').
+//   7. Every Kannada operator word also has its usual C symbol
+//      ('ಸೇರಿಸು' or '+', 'ಸಮಾನ' or '==', ...). Both forms are equivalent.
+//   8. Multiple declarators per declaration, array initialisers '{...}',
+//      multi-dimensional arrays, 'ಸ್ಥಿರ' (const) and character literals.
+//   9. Declarations may appear in any order at file level: a function can
+//      be called before it is defined.
+//  10. The return type ('ಫಲಿತಾಂಶ' ...) is optional; it defaults to 'ಶೂನ್ಯ'.
+//  11. Lexer: identifiers may no longer start with a Kannada digit; Kannada
+//      digits (೦-೯) are accepted in number literals; hexadecimal / binary
+//      literals, exponents in floats, escape sequences and ZWJ / ZWNJ inside
+//      identifiers are supported.
+//  12. 'ಹೆಚ್ಚಾಗಲಿ' means >= and 'ಕಡಿಮೆಯಾಗಲಿ' means <= (this was implicit).
+// =====================================================================
+
+// ----------------- Parser rules -----------------
+
+program
+    : importDecl* topLevelDecl* EOF
+    ;
+
+importDecl
+    : 'ಆಮದು' STRING_LITERAL ';'
+    ;
+
+topLevelDecl
+    : structDecl
+    | functionDecl
+    | externDecl
+    | declaration
+    ;
+
+// ---- types ----
+
+type
+    : baseType '*'*
+    ;
+
+baseType
+    : 'ಸಂಖ್ಯೆ'            // int (32 bit)
+    | 'ದೀರ್ಘ'             // long long (64 bit)
+    | 'ದಶಾಂಶ'            // double
+    | 'ಅಕ್ಷರ'             // char (one byte)
+    | 'ಪದ'               // string  == ಅಕ್ಷರ*
+    | 'ತಾರ್ಕಿಕ'           // boolean
+    | 'ಶೂನ್ಯ'             // void (return type / 'ಶೂನ್ಯ*' only)
+    | 'ಚರಪಟ್ಟಿ'           // variable argument list (va_list)
+    | 'ರಚನೆ'? STRUCT_NAME // a struct declared with 'ರಚನೆ'
+    ;
+
+// ---- structures ----
+
+structDecl
+    : 'ರಚನೆ' ID '{' structMember* '}' ';'?     // definition
+    | 'ರಚನೆ' ID ';'                            // opaque (forward) declaration
+    ;
+
+structMember
+    : type memberDeclarator (',' memberDeclarator)* ';'
+    ;
+
+memberDeclarator
+    : ID ('[' expression ']')*
+    ;
+
+// ---- variables ----
+
+declaration
+    : 'ಸ್ಥಿರ'? type declarator (',' declarator)* ';'
+    ;
+
+declarator
+    : ID ('[' expression? ']')* ('=' initializer)?   // '[]' only with an initializer
+    ;
+
+initializer
+    : expression
+    | '{' (initializer (',' initializer)* ','?)? '}'
+    ;
+
+// ---- functions ----
+
+functionDecl
+    : 'ಕ್ರಿಯೆ' ID '(' paramListOpt ')' ('ಫಲಿತಾಂಶ' type)? block
+    ;
+
+externDecl
+    : 'ಬಾಹ್ಯ' STRING_LITERAL? 'ಕ್ರಿಯೆ' ID '(' paramListOpt ')' ('ಫಲಿತಾಂಶ' type)? ';'
+    | 'ಬಾಹ್ಯ' STRING_LITERAL? 'ಸ್ಥಿರ'? type ID ';'
+    ;   // STRING_LITERAL = name of the symbol in the C object code
+
+paramListOpt
+    : paramList (',' '...')?
+    | 'ಶೂನ್ಯ'
+    | /* empty */
+    ;
+
+paramList
+    : param (',' param)*
+    ;
+
+param
+    : 'ಸ್ಥಿರ'? type ID ('[' expression? ']')*
+    ;
+
+// ---- statements ----
+
+block
+    : '{' statement* '}'
+    ;
+
+statement
+    : block
+    | declaration
+    | simpleStatement ';'
+    | ifStatement
+    | whileStatement
+    | doWhileStatement
+    | forStatement
+    | switchStatement
+    | printStatement ';'
+    | readStatement ';'
+    | returnStatement ';'
+    | 'ನಿಲ್ಲಿಸು' ';'                 // break
+    | 'ಮುಂದುವರಿಸು' ';'               // continue
+    | ';'
+    ;
+
+simpleStatement
+    : assignment
+    | incDec
+    | expression                    // must be a function call
+    ;
+
+assignment
+    : unaryExpr 'ಗೆ' expression 'ನಿಗದಿ'           // x ಗೆ 5 ನಿಗದಿ
+    | unaryExpr assignOp expression               // x = 5 ,  x += 5
+    ;
+
+assignOp
+    : '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '>>='
+    ;
+
+incDec
+    : unaryExpr ('++' | '--')
+    | ('++' | '--') unaryExpr
+    ;
+
+ifStatement
+    : '(' expression ')' 'ಆದರೆ' statement ('ಇಲ್ಲವಾದರೆ' statement)?
+    ;
+
+whileStatement
+    : '(' expression ')' 'ಸಮಯವರೆಗೆ' statement
+    ;
+
+doWhileStatement
+    : 'ಮಾಡು' statement '(' expression ')' 'ಸಮಯವರೆಗೆ' ';'
+    ;
+
+forStatement
+    : 'ಎಣಿಕೆ' '(' forInit? ';' expression? ';' forUpdate? ')' statement
+    ;
+
+forInit
+    : 'ಸ್ಥಿರ'? type declarator (',' declarator)*
+    | simpleStatement (',' simpleStatement)*
+    ;
+
+forUpdate
+    : simpleStatement (',' simpleStatement)*
+    ;
+
+switchStatement
+    : 'ಆಯ್ಕೆ' '(' expression ')' '{' switchSection* '}'
+    ;
+
+switchSection
+    : ('ಸಂದರ್ಭ' expression ':' | 'ಪೂರ್ವನಿಯೋಜಿತ' ':') statement*
+    ;
+
+printStatement
+    : ('ಮುದ್ರಿಸು' | 'ಸಾಲುಮುದ್ರಿಸು') '(' (expression (',' expression)*)? ')'
+    ;
+
+readStatement
+    : 'ಓದು' '(' unaryExpr (',' unaryExpr)* ')'
+    ;
+
+returnStatement
+    : 'ಮರಳಿ' expression?
+    ;
+
+// ----------------- Expressions -----------------
+// (lowest precedence first)
+
+expression
+    : conditionalExpr
+    ;
+
+conditionalExpr
+    : logicalOrExpr ('?' expression ':' conditionalExpr)?
+    ;
+
+logicalOrExpr
+    : logicalAndExpr (('ಅಥವಾ' | '||') logicalAndExpr)*
+    ;
+
+logicalAndExpr
+    : bitOrExpr (('ಮತ್ತು' | '&&') bitOrExpr)*
+    ;
+
+bitOrExpr
+    : bitXorExpr ('|' bitXorExpr)*
+    ;
+
+bitXorExpr
+    : bitAndExpr ('^' bitAndExpr)*
+    ;
+
+bitAndExpr
+    : equalityExpr ('&' equalityExpr)*
+    ;
+
+equalityExpr
+    : relationalExpr (('ಸಮಾನ' | 'ಸಮಾನವಲ್ಲ' | '==' | '!=') relationalExpr)*
+    ;
+
+relationalExpr
+    : shiftExpr (('ಹೆಚ್ಚು' | 'ಕಡಿಮೆ' | 'ಹೆಚ್ಚಾಗಲಿ' | 'ಕಡಿಮೆಯಾಗಲಿ'
+                 | '>' | '<' | '>=' | '<=') shiftExpr)*
+    ;
+
+shiftExpr
+    : additiveExpr (('<<' | '>>') additiveExpr)*
+    ;
+
+additiveExpr
+    : multiplicativeExpr (('ಸೇರಿಸು' | 'ಕಡಿತ' | '+' | '-') multiplicativeExpr)*
+    ;
+
+multiplicativeExpr
+    : unaryExpr (('ಗುಣಿಸು' | 'ಭಾಗಿಸು' | 'ಶೇಷ' | '*' | '/' | '%') unaryExpr)*
+    ;
+
+unaryExpr
+    : ('ಅಲ್ಲ' | '!' | '-' | '+' | '~' | '&' | '*') unaryExpr
+    | '(' type ')' unaryExpr                         // cast
+    | 'ಗಾತ್ರ' '(' (type | expression) ')'           // sizeof
+    | postfixExpr
+    ;
+
+postfixExpr
+    : primary ( '[' expression ']'
+              | '(' (expression (',' expression)*)? ')'
+              | '.' ID
+              | '->' ID )*
+    ;
+
+primary
+    : INT_LITERAL
+    | FLOAT_LITERAL
+    | STRING_LITERAL+                // adjacent literals are joined
+    | CHAR_LITERAL
+    | BOOL_LITERAL
+    | 'ಖಾಲಿ'                          // null pointer
+    | ID
+    | '(' expression ')'
+    | 'ಚರ_ಆರಂಭ' '(' expression ')'                 // va_start
+    | 'ಚರ_ಮೌಲ್ಯ' '(' expression ',' type ')'       // va_arg
+    | 'ಚರ_ಅಂತ್ಯ' '(' expression ')'                 // va_end
+    | 'ಚರ_ನಕಲು' '(' expression ',' expression ')'  // va_copy
+    ;
+
+// ----------------- Lexer rules -----------------
+
+BOOL_LITERAL
+    : 'ಸತ್ಯ' | 'ಅಸತ್ಯ'
+    ;
+
+fragment DIGIT    : [0-9\u0CE6-\u0CEF] ;        // ASCII or Kannada digits
+fragment HEXDIGIT : [0-9a-fA-F] ;
+
+INT_LITERAL
+    : DIGIT+
+    | '0' [xX] HEXDIGIT+
+    | '0' [bB] [01]+
+    ;
+
+FLOAT_LITERAL
+    : DIGIT+ '.' DIGIT+ ([eE] [+-]? DIGIT+)?
+    | DIGIT+ [eE] [+-]? DIGIT+
+    ;
+
+fragment ESCAPE
+    : '\\' ( [ntrabfv0\\'"?e]
+           | 'x' HEXDIGIT HEXDIGIT?
+           | [0-7] [0-7]? [0-7]?
+           | 'u' HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT
+           | 'U' HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT )
+    ;
+
+STRING_LITERAL
+    : '"' (~["\\\r\n] | ESCAPE)* '"'
+    ;
+
+CHAR_LITERAL       // ASCII char -> type ಅಕ್ಷರ; Kannada char -> its code point (ಸಂಖ್ಯೆ)
+    : '\'' (~['\\\r\n] | ESCAPE) '\''
+    ;
+
+ID
+    : [\u0C80-\u0CE5\u0CF0-\u0CFFa-zA-Z_]
+      [\u0C80-\u0CFFa-zA-Z_0-9\u200C\u200D]*
+    ;   // STRUCT_NAME is an ID that was declared with 'ರಚನೆ'
+
+WS
+    : [ \t\r\n\f\u00A0\uFEFF]+ -> skip
+    ;
+
+LINE_COMMENT
+    : '//' ~[\r\n]* -> skip
+    ;
+
+BLOCK_COMMENT
+    : '/*' .*? '*/' -> skip
+    ;

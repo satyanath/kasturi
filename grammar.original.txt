@@ -1,0 +1,184 @@
+grammar KannadaC;
+
+// ----------------- Parser rules -----------------
+
+program
+    : (declaration | functionDecl | structDecl)* EOF
+    ;
+
+declaration
+    : type ID ('[' INT_LITERAL ']')? assignOpt ';'
+    ;
+
+assignOpt
+    : '=' expression
+    | /* empty */
+    ;
+
+type
+    : 'ಸಂಖ್ಯೆ'
+    | 'ದಶಾಂಶ'
+    | 'ಅಕ್ಷರ'
+    | 'ಪದ'
+    | 'ಸತ್ಯ'
+    ;
+
+structDecl
+    : 'ರಚನೆ' ID '{' structMember* '}' ';'
+    ;
+
+structMember
+    : type ID ('[' INT_LITERAL ']')? ';'
+    ;
+
+functionDecl
+    : 'ಕ್ರಿಯೆ' ID '(' paramListOpt ')' 'ಫಲಿತಾಂಶ' returnType block
+    ;
+
+paramListOpt
+    : paramList
+    | /* empty */
+    ;
+
+paramList
+    : param (',' param)*
+    ;
+
+param
+    : type ID
+    ;
+
+returnType
+    : type
+    | 'ಶೂನ್ಯ'
+    ;
+
+block
+    : '{' statement* '}'
+    ;
+
+statement
+    : declaration
+    | assignment ';'
+    | ifStatement
+    | whileStatement
+    | forStatement
+    | printStatement ';'
+    | returnStatement ';'
+    | 'ನಿಲ್ಲಿಸು' ';'
+    | 'ಮುಂದುವರಿಸು' ';'
+    | block
+    ;
+
+assignment
+    : ID ('[' expression ']')? 'ಗೆ' expression 'ನಿಗದಿ'
+    ;
+
+ifStatement
+    : '(' expression ')' 'ಆದರೆ' statement ('ಇಲ್ಲವಾದರೆ' statement)?
+    ;
+
+whileStatement
+    : '(' expression ')' 'ಸಮಯವರೆಗೆ' block
+    ;
+
+forStatement
+    : 'ಎಣಿಕೆ' '(' forInit ';' expression ';' forUpdate ')' block
+    ;
+
+forInit
+    : assignment
+    | declaration
+    ;
+
+forUpdate
+    : assignment
+    ;
+
+printStatement
+    : 'ಮುದ್ರಿಸು' '(' expression ')'
+    ;
+
+returnStatement
+    : 'ಮರಳಿ' expression?
+    ;
+
+// ----------------- Expressions -----------------
+
+expression
+    : logicalOrExpr
+    ;
+
+logicalOrExpr
+    : logicalAndExpr ( 'ಅಥವಾ' logicalAndExpr )*
+    ;
+
+logicalAndExpr
+    : equalityExpr ( 'ಮತ್ತು' equalityExpr )*
+    ;
+
+equalityExpr
+    : relationalExpr ( ( 'ಸಮಾನ' | 'ಸಮಾನವಲ್ಲ' ) relationalExpr )*
+    ;
+
+relationalExpr
+    : additiveExpr ( ( 'ಹೆಚ್ಚು' | 'ಕಡಿಮೆ' | 'ಹೆಚ್ಚಾಗಲಿ' | 'ಕಡಿಮೆಯಾಗಲಿ' ) additiveExpr )*
+    ;
+
+additiveExpr
+    : multiplicativeExpr ( ( 'ಸೇರಿಸು' | 'ಕಡಿತ' ) multiplicativeExpr )*
+    ;
+
+multiplicativeExpr
+    : unaryExpr ( ( 'ಗುಣಿಸು' | 'ಭಾಗಿಸು' ) unaryExpr )*
+    ;
+
+unaryExpr
+    : 'ಅಲ್ಲ' unaryExpr
+    | primary
+    ;
+
+primary
+    : INT_LITERAL
+    | FLOAT_LITERAL
+    | STRING_LITERAL
+    | BOOL_LITERAL
+    | ID
+    | ID '[' expression ']'
+    | '(' expression ')'
+    ;
+
+// ----------------- Lexer rules -----------------
+
+BOOL_LITERAL
+    : 'ಸತ್ಯ' | 'ಅಸತ್ಯ'
+    ;
+
+INT_LITERAL
+    : [0-9]+
+    ;
+
+FLOAT_LITERAL
+    : [0-9]+ '.' [0-9]+
+    ;
+
+STRING_LITERAL
+    : '"' (~["\\] | '\\' .)* '"'
+    ;
+
+ID
+    : [\u0C80-\u0CFFa-zA-Z_][\u0C80-\u0CFFa-zA-Z_0-9]*
+    ;
+
+// Whitespace and comments
+WS
+    : [ \t\r\n]+ -> skip
+    ;
+
+LINE_COMMENT
+    : '//' ~[\r\n]* -> skip
+    ;
+
+BLOCK_COMMENT
+    : '/*' .*? '*/' -> skip
+    ;
